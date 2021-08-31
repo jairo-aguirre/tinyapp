@@ -12,9 +12,10 @@ const app = express();
 app.set('view engine', 'ejs');
 app.use(bodyParser.urlencoded({ extended: true }));
 
-const urlDatabase = {
+let urlDatabase = {
   "b2xVn2": "http://www.nfl.com",
-  "9sm5xK": "http://www.canada.ca"
+  "9sm5xK": "http://www.canada.ca",
+  "1hr5xK": "http://www.yahoo.com"
 };
 
 app.get('/', (req, res) => {
@@ -32,12 +33,15 @@ app.get('/urls/new', (req, res) => {
 
 app.get('/urls/:shortURL', (req, res) => {
   const templateVars = { shortURL: req.params.shortURL, longURL: urlDatabase[req.params.shortURL] };
-  res.render('urls_show', templateVars);
+  // res.render('urls_show', templateVars);
+  res.redirect(urlDatabase[req.params.shortURL]);
 });
 
 app.post('/urls', (req, res) => {
-  console.log(req.body);
-  res.send('200 OK');
+  const shortURL = generateRandomString();
+  urlDatabase[shortURL] = req.body.longURL;
+  // res.send('200 OK');
+  res.redirect(`/urls/${shortURL}`);
 });
 
 app.get('/hello', (req, res) => {
