@@ -3,6 +3,10 @@ const bodyParser = require('body-parser');
 
 const PORT = 8080;
 
+const generateRandomString = (() => {
+  return Math.random().toString(32).substring(2, 8); // string of 6 pseudo-random alphanumeric characters
+});
+
 const app = express();
 
 app.set('view engine', 'ejs');
@@ -33,7 +37,7 @@ app.get('/urls/:shortURL', (req, res) => {
 
 app.post('/urls', (req, res) => {
   console.log(req.body);
-  res.send('OK');
+  res.send('200 OK');
 });
 
 app.get('/hello', (req, res) => {
