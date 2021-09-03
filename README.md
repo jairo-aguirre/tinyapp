@@ -6,7 +6,9 @@ TinyApp is a full stack web application built with Node and Express that allows 
 
 !["List uf URLs associated with the logged user"](https://raw.githubusercontent.com/vandergit/tinyapp/master/docs/urls-page.png)
 
-!["screenshot description"](#)
+!["Create a new TinyURL"](https://raw.githubusercontent.com/vandergit/tinyapp/master/docs/create-TinyURL.png)
+
+!["Edit a new TinyURL"](https://raw.githubusercontent.com/vandergit/tinyapp/master/docs/edit-TinyURL.png)
 
 ## Dependencies
 
