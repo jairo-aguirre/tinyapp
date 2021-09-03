@@ -1,6 +1,7 @@
 const express = require('express');
 const bodyParser = require('body-parser');
 const cookieParser = require('cookie-parser');
+const bcryptjs = require('bcryptjs');
 
 const PORT = 8080;
 
@@ -89,15 +90,18 @@ app.get('/hello', (req, res) => {
 app.get('/urls', (req, res) => {
   const userID = req.cookies.user_ID;
 
-  if (userID) {
+  // if (userID) {
     const templateVars = { username: getUserObject('user', req.cookies['user_ID']), urls: urlsForUser(userID) };
     
     res.render('urls_index', templateVars);
 
     return;
-  }
+  // }
 
-  return res.status(401).send('Hi there, please log in or register to access TinyApp');
+  // res.render('urls_index', templateVars);
+  // return res.status(401).send('Hi there, please log in or register to access TinyApp');
+  // res.status(401);
+  // res.redirect('/login');
 });
 
 app.get('/urls/new', (req, res) => {
@@ -129,7 +133,7 @@ app.get('/urls/:shortURL', (req, res) => {
 });
 
 app.get('/register', (req, res) => {
-  const templateVars = { user_ID: getUserObject('user', req.cookies['user_ID']) };
+  const templateVars = { username: getUserObject('user', req.cookies['user_ID']) };
   
   if (templateVars.username !== null) {
     res.redirect('/urls');
@@ -185,7 +189,7 @@ app.post('/urls/:shortURL/delete', (req, res) => {
   const shortURL = req.params.shortURL;
   const userID = req.cookies.user_ID;
   const userUrls = urlsForUser(userID);
-  
+
   if (userID) {
     if (userUrls[shortURL]) {
       delete urlDatabase[shortURL];
@@ -213,12 +217,13 @@ app.post('/login', (req, res) => {
 
   const user = getUserObject('email', email);
 
-  if (user.password !== password) {
-    return res.status(403).send('Forbidden access');
+  if (bcryptjs.compareSync(password, user.password)) {    
+    res.cookie('user_ID', user.id);
+    res.redirect('/urls');
+    return;
   }
-
-  res.cookie('user_ID', user.id);
-  res.redirect('/urls');
+  
+  return res.status(403).send('Forbidden access');
 });
 
 app.post('/logout', (req, res) => {
@@ -239,7 +244,7 @@ app.post('/register', (req, res) => {
   }
 
   const userID = generateRandomString();
-  users[userID] = { id: userID, email: email, password: password };
+  users[userID] = { id: userID, email: email, password: bcryptjs.hashSync(password, 10) };
   
   res.cookie('user_ID', userID);
   res.redirect('/urls');
