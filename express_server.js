@@ -1,14 +1,20 @@
+// Importing required modules
 const express = require('express');
 const bodyParser = require('body-parser');
-const cookieParser = require('cookie-parser');
 const cookieSession = require('cookie-session');
 const bcryptjs = require('bcryptjs');
-const { getUserObject } = require('./helpers');
+const {
+  getUserObject,
+  generateRandomString,
+  emailLookUp,
+  urlsForUser
+} = require('./helpers'); // TinyApp modules
 
 const PORT = 8080;
 
 const app = express();
 
+// Setting up TinyApp to use imported modules
 app.set('view engine', 'ejs');
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(cookieSession({
@@ -17,8 +23,9 @@ app.use(cookieSession({
 
   // Cookie Options
   maxAge: 24 * 60 * 60 * 1000 // 24 hours
-}))
+}));
 
+// Local databases for urls and users
 const urlDatabase = {
   b6UTxQ: {
     longURL: "https://www.tsn.ca",
@@ -31,7 +38,7 @@ const urlDatabase = {
   c3R6gg: {
     longURL: "https://www.canada.ca",
     userID: "JAG"
-}
+  }
 };
 
 const users = {
@@ -48,46 +55,27 @@ const users = {
   "JAG": {
     id: "JAG",
     email: "j@a.com",
-    password: "d"
+    password: "$2a$10$QooLP1dJG/dq5u9Iu0TiyeabJfLU3KkdyCNZDZvyKl2lgM2Lg6E6C"
   }
 };
 
-const generateRandomString = (() => {
-  return Math.random().toString(32).substring(2, 8); // string of 6 pseudo-random alphanumeric characters
-});
-
-const emailLookUp = (email) => {
-  for (const key in users) {
-    if (users[key].email === email) return true;
-  }
-  return false;
-};
-
-const urlsForUser = (user) => {
-  let userUrls = {};
-
-  for (const key in urlDatabase) {
-    if (urlDatabase[key].userID === user) {      
-      userUrls[key] = {longURL: urlDatabase[key].longURL};
-    }
-  }
-
-  return userUrls;
-};
-
+// GET Routes start HERE!
 app.get('/', (req, res) => {
-  res.send('Hello!');
-});
+  const userID = req.session.user_ID;
 
-app.get('/hello', (req, res) => {
-  res.send('<html><body>Hello <b>World<b><body><html>\n');
+  if (userID) {
+    res.redirect('/urls');
+    return;
+  }
+
+  res.redirect('/login');
 });
 
 app.get('/urls', (req, res) => {
   const userID = req.session.user_ID;
 
   if (userID) {
-    const templateVars = { username: getUserObject('user', userID, users), urls: urlsForUser(userID) };
+    const templateVars = { username: getUserObject('user', userID, users), urls: urlsForUser(userID, urlDatabase) };
     
     res.render('urls_index', templateVars);
 
@@ -102,7 +90,7 @@ app.get('/urls/new', (req, res) => {
 
   const templateVars = { username: getUserObject('user', userID, users) };
   
-  if(templateVars.username === null) {
+  if (templateVars.username === null) {
     res.redirect('/login');
     return;
   }
@@ -112,12 +100,29 @@ app.get('/urls/new', (req, res) => {
 app.get('/urls/:shortURL', (req, res) => {
   const shortURL = req.params.shortURL;
   const userID = req.session.user_ID;
-  const userUrls = urlsForUser(userID);
+  const userUrls = urlsForUser(userID, urlDatabase);
   
   if (userID) {
     if (userUrls[shortURL]) {
       const templateVars = { username: getUserObject('user', userID, users), shortURL: shortURL, longURL: userUrls[shortURL].longURL };
       res.render('urls_show', templateVars);
+      return;
+    } else {
+      return res.status(404).send('Not found');
+    }
+  }
+
+  return res.status(401).send('Hi there, please <a href="/login">log in</a> or <a href="/register">register</a> to access TinyApp');
+});
+
+app.get('/u/:shortURL', (req, res) => {
+  const shortURL = req.params.shortURL;
+  const userID = req.session.user_ID;
+  const userUrls = urlsForUser(userID, urlDatabase);
+
+  if (userID) {
+    if (userUrls[shortURL]) {
+      res.redirect(userUrls[shortURL].longURL);
       return;
     } else {
       return res.status(404).send('Not found');
@@ -150,12 +155,13 @@ app.get('/login', (req, res) => {
   res.render('login', templateVars);
 });
 
+// POST Routes start HERE!
 app.post('/urls', (req, res) => {
   const userID = req.session.user_ID;
   
   if (userID) {
     const shortURL = generateRandomString();
-    const urlObject = {longURL: req.body.longURL, userID: userID}
+    const urlObject = {longURL: req.body.longURL, userID: userID};
     urlDatabase[shortURL] = urlObject;
     res.redirect(`/urls/${shortURL}`);
     return;
@@ -167,12 +173,12 @@ app.post('/urls', (req, res) => {
 app.post('/urls/:shortURL/edit', (req, res) => {
   const shortURL = req.params.shortURL;
   const userID = req.session.user_ID;
-  const userUrls = urlsForUser(userID);
+  const userUrls = urlsForUser(userID, urlDatabase);
 
   if (userID) {
     if (userUrls[shortURL]) {
       urlDatabase[shortURL].longURL = req.body.url;
-      res.redirect(`/urls/${shortURL}`);      
+      res.redirect(`/urls/${shortURL}`);
       return;
     } else {
       return res.status(404).send('Not found');
@@ -185,12 +191,12 @@ app.post('/urls/:shortURL/edit', (req, res) => {
 app.post('/urls/:shortURL/delete', (req, res) => {
   const shortURL = req.params.shortURL;
   const userID = req.session.user_ID;
-  const userUrls = urlsForUser(userID);
+  const userUrls = urlsForUser(userID, urlDatabase);
 
   if (userID) {
     if (userUrls[shortURL]) {
       delete urlDatabase[shortURL];
-      res.redirect(`/urls/`);      
+      res.redirect(`/urls/`);
       return;
     } else {
       return res.status(404).send('Not found');
@@ -208,7 +214,7 @@ app.post('/login', (req, res) => {
     return res.status(400).send('Missing email or password');
   }
 
-  if (!emailLookUp(email)) {
+  if (!emailLookUp(email, users)) {
     return res.status(403).send('Forbidden access');
   }
 
@@ -236,7 +242,7 @@ app.post('/register', (req, res) => {
     return res.status(400).send('Missing email or password');
   }
 
-  if (emailLookUp(email)) {
+  if (emailLookUp(email, users)) {
     return res.status(400).send('Email already registered');
   }
 
@@ -247,6 +253,7 @@ app.post('/register', (req, res) => {
   res.redirect('/urls');
 });
 
+// Set up the TinyApp server connection and display its port
 app.listen(PORT, () => {
-  console.log(`Example app listening on port: ${PORT}!`);
+  console.log(`TinyApp app listening on port: ${PORT}!`);
 });
