@@ -3,6 +3,7 @@ const bodyParser = require('body-parser');
 const cookieParser = require('cookie-parser');
 const cookieSession = require('cookie-session');
 const bcryptjs = require('bcryptjs');
+const { getUserObject } = require('./helpers');
 
 const PORT = 8080;
 
@@ -10,7 +11,6 @@ const app = express();
 
 app.set('view engine', 'ejs');
 app.use(bodyParser.urlencoded({ extended: true }));
-// app.use(cookieSession());
 app.use(cookieSession({
   name: 'session',
   keys: ['user_ID'],
@@ -56,18 +56,6 @@ const generateRandomString = (() => {
   return Math.random().toString(32).substring(2, 8); // string of 6 pseudo-random alphanumeric characters
 });
 
-const getUserObject = (type, value) => {
-  for (const key in users) {
-    if (type === "user") {
-      if (key === value) return users[key];
-    }
-    if (type === "email") {
-      if (users[key].email === value) return users[key];
-    }
-  }
-  return null;
-}
-
 const emailLookUp = (email) => {
   for (const key in users) {
     if (users[key].email === email) return true;
@@ -96,29 +84,23 @@ app.get('/hello', (req, res) => {
 });
 
 app.get('/urls', (req, res) => {
-  // const userID = req.cookies.user_ID;
   const userID = req.session.user_ID;
 
-  // if (userID) {
-    const templateVars = { username: getUserObject('user', userID), urls: urlsForUser(userID) };
+  if (userID) {
+    const templateVars = { username: getUserObject('user', userID, users), urls: urlsForUser(userID) };
     
     res.render('urls_index', templateVars);
 
     return;
-  // }
+  }
 
-  // res.render('urls_index', templateVars);
-  // return res.status(401).send('Hi there, please log in or register to access TinyApp');
-  // res.status(401);
-  // res.redirect('/login');
+  return res.status(401).send('Hi there, please <a href="/login">log in</a> or <a href="/register">register</a> to access TinyApp');
 });
 
 app.get('/urls/new', (req, res) => {
   const userID = req.session.user_ID;
 
-  // const templateVars = { username: getUserObject('user', req.cookies['user_ID']) };
-
-  const templateVars = { username: getUserObject('user', userID) };
+  const templateVars = { username: getUserObject('user', userID, users) };
   
   if(templateVars.username === null) {
     res.redirect('/login');
@@ -134,7 +116,7 @@ app.get('/urls/:shortURL', (req, res) => {
   
   if (userID) {
     if (userUrls[shortURL]) {
-      const templateVars = { username: getUserObject('user', userID), shortURL: shortURL, longURL: userUrls[shortURL].longURL };
+      const templateVars = { username: getUserObject('user', userID, users), shortURL: shortURL, longURL: userUrls[shortURL].longURL };
       res.render('urls_show', templateVars);
       return;
     } else {
@@ -142,12 +124,12 @@ app.get('/urls/:shortURL', (req, res) => {
     }
   }
 
-  return res.status(401).send('Hi there, please log in or register to access TinyApp');
+  return res.status(401).send('Hi there, please <a href="/login">log in</a> or <a href="/register">register</a> to access TinyApp');
 });
 
 app.get('/register', (req, res) => {
   const userID = req.session.user_ID;
-  const templateVars = { username: getUserObject('user', userID) };
+  const templateVars = { username: getUserObject('user', userID, users) };
   
   if (templateVars.username !== null) {
     res.redirect('/urls');
@@ -158,7 +140,7 @@ app.get('/register', (req, res) => {
 
 app.get('/login', (req, res) => {
   const userID = req.session.user_ID;
-  const templateVars = { username: getUserObject('user', userID) };
+  const templateVars = { username: getUserObject('user', userID, users) };
 
   if (templateVars.username !== null) {
     res.redirect('/urls');
@@ -196,7 +178,7 @@ app.post('/urls/:shortURL/edit', (req, res) => {
       return res.status(404).send('Not found');
     }
   } else {
-    return res.status(401).send('Hi there, please log in or register to access TinyApp');
+    return res.status(401).send('Hi there, please <a href="/login">log in</a> or <a href="/register">register</a> to access TinyApp');
   }
 });
 
@@ -214,7 +196,7 @@ app.post('/urls/:shortURL/delete', (req, res) => {
       return res.status(404).send('Not found');
     }
   } else {
-    return res.status(401).send('Hi there, please log in or register to access TinyApp');
+    return res.status(401).send('Hi there, please <a href="/login">log in</a> or <a href="/register">register</a> to access TinyApp');
   }
 });
 
@@ -230,10 +212,9 @@ app.post('/login', (req, res) => {
     return res.status(403).send('Forbidden access');
   }
 
-  const user = getUserObject('email', email);
+  const user = getUserObject('email', email, users);
 
-  if (bcryptjs.compareSync(password, user.password)) {    
-    // res.cookie('user_ID', user.id);
+  if (bcryptjs.compareSync(password, user.password)) {
     req.session.user_ID = user.id;
     res.redirect('/urls');
     return;
@@ -243,7 +224,6 @@ app.post('/login', (req, res) => {
 });
 
 app.post('/logout', (req, res) => {
-  // res.clearCookie('user_ID');
   res.clearCookie('session');
   res.redirect('/urls/');
 });
@@ -263,7 +243,6 @@ app.post('/register', (req, res) => {
   const userID = generateRandomString();
   users[userID] = { id: userID, email: email, password: bcryptjs.hashSync(password, 10) };
   
-  // res.cookie('user_ID', userID);
   req.session.user_ID = userID;
   res.redirect('/urls');
 });
