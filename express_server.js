@@ -10,10 +10,19 @@ app.set('view engine', 'ejs');
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(cookieParser());
 
-let urlDatabase = {
-  "b2xVn2": "http://www.nfl.com",
-  "9sm5xK": "http://www.canada.ca",
-  "1hr5xK": "http://www.yahoo.com"
+const urlDatabase = {
+  b6UTxQ: {
+    longURL: "https://www.tsn.ca",
+    userID: "aJ48lW"
+  },
+  i3BoGr: {
+    longURL: "https://www.google.ca",
+    userID: "JAG"
+  },
+  c3R6gg: {
+    longURL: "https://www.canada.ca",
+    userID: "JAG"
+}
 };
 
 const users = {
@@ -29,8 +38,8 @@ const users = {
   },
   "JAG": {
     id: "JAG",
-    email: "jairo@aguirre.com",
-    password: "dark-matter"
+    email: "j@a.com",
+    password: "d"
   }
 };
 
@@ -38,25 +47,35 @@ const generateRandomString = (() => {
   return Math.random().toString(32).substring(2, 8); // string of 6 pseudo-random alphanumeric characters
 });
 
-const getUserObject = (user) => {
+const getUserObject = (type, value) => {
   for (const key in users) {
-    if (key === user) return users[key];
+    if (type === "user") {
+      if (key === value) return users[key];
+    }
+    if (type === "email") {
+      if (users[key].email === value) return users[key];
+    }
   }
   return null;
-};
-
-const getUserObjectByEmail = (email) => {
-  for (const key in users) {
-    if (users[key].email === email) return users[key];
-  }
-  return null;
-};
+}
 
 const emailLookUp = (email) => {
   for (const key in users) {
     if (users[key].email === email) return true;
   }
   return false;
+};
+
+const urlsForUser = (user) => {
+  let userUrls = {};
+
+  for (const key in urlDatabase) {
+    if (urlDatabase[key].userID === user) {      
+      userUrls[key] = {longURL: urlDatabase[key].longURL};
+    }
+  }
+
+  return userUrls;
 };
 
 app.get('/', (req, res) => {
@@ -68,46 +87,116 @@ app.get('/hello', (req, res) => {
 });
 
 app.get('/urls', (req, res) => {
-  const templateVars = { username: getUserObject(req.cookies['username']), urls: urlDatabase };
-  res.render('urls_index', templateVars);
+  const userID = req.cookies.user_ID;
+
+  if (userID) {
+    const templateVars = { username: getUserObject('user', req.cookies['user_ID']), urls: urlsForUser(userID) };
+    
+    res.render('urls_index', templateVars);
+
+    return;
+  }
+
+  return res.status(401).send('Hi there, please log in or register to access TinyApp');
 });
 
 app.get('/urls/new', (req, res) => {
-  const templateVars = { username: getUserObject(req.cookies['username']) };
+  const templateVars = { username: getUserObject('user', req.cookies['user_ID']) };
+  
+  if(templateVars.username === null) {
+    res.redirect('/login');
+    return;
+  }
   res.render('urls_new', templateVars);
 });
 
 app.get('/urls/:shortURL', (req, res) => {
-  const templateVars = { username: getUserObject(req.cookies['username']), shortURL: req.params.shortURL, longURL: urlDatabase[req.params.shortURL] };
-  res.render('urls_show', templateVars);
+  const shortURL = req.params.shortURL;
+  const userID = req.cookies.user_ID;
+  const userUrls = urlsForUser(userID);
+  
+  if (userID) {
+    if (userUrls[shortURL]) {
+      const templateVars = { username: getUserObject('user', userID), shortURL: shortURL, longURL: userUrls[shortURL].longURL };
+      res.render('urls_show', templateVars);
+      return;
+    } else {
+      return res.status(404).send('Not found');
+    }
+  }
+
+  return res.status(401).send('Hi there, please log in or register to access TinyApp');
 });
 
 app.get('/register', (req, res) => {
-  const templateVars = { username: getUserObject(req.cookies['username']) };
+  const templateVars = { user_ID: getUserObject('user', req.cookies['user_ID']) };
+  
+  if (templateVars.username !== null) {
+    res.redirect('/urls');
+    return;
+  }
   res.render('register', templateVars);
 });
 
 app.get('/login', (req, res) => {
-  const templateVars = { username: getUserObject(req.cookies['username']) };
+  const templateVars = { username: getUserObject('user', req.cookies['user_ID']) };
+
+  if (templateVars.username !== null) {
+    res.redirect('/urls');
+    return;
+  }
+
   res.render('login', templateVars);
 });
 
 app.post('/urls', (req, res) => {
-  const shortURL = generateRandomString();
-  urlDatabase[shortURL] = req.body.longURL;
-  res.redirect(`/urls/${shortURL}`);
+  const userID = req.cookies.user_ID;
+  
+  if (userID) {
+    const shortURL = generateRandomString();
+    const urlObject = {longURL: req.body.longURL, userID: userID}
+    urlDatabase[shortURL] = urlObject;
+    res.redirect(`/urls/${shortURL}`);
+    return;
+  }
+
+  return res.status(403).send('Forbidden access');
 });
 
 app.post('/urls/:shortURL/edit', (req, res) => {
   const shortURL = req.params.shortURL;
-  urlDatabase[shortURL] = req.body.url;
-  res.redirect(`/urls/${shortURL}`);
+  const userID = req.cookies.user_ID;
+  const userUrls = urlsForUser(userID);
+
+  if (userID) {
+    if (userUrls[shortURL]) {
+      urlDatabase[shortURL].longURL = req.body.url;
+      res.redirect(`/urls/${shortURL}`);      
+      return;
+    } else {
+      return res.status(404).send('Not found');
+    }
+  } else {
+    return res.status(401).send('Hi there, please log in or register to access TinyApp');
+  }
 });
 
 app.post('/urls/:shortURL/delete', (req, res) => {
   const shortURL = req.params.shortURL;
-  delete urlDatabase[shortURL];
-  res.redirect(`/urls/`);
+  const userID = req.cookies.user_ID;
+  const userUrls = urlsForUser(userID);
+  
+  if (userID) {
+    if (userUrls[shortURL]) {
+      delete urlDatabase[shortURL];
+      res.redirect(`/urls/`);      
+      return;
+    } else {
+      return res.status(404).send('Not found');
+    }
+  } else {
+    return res.status(401).send('Hi there, please log in or register to access TinyApp');
+  }
 });
 
 app.post('/login', (req, res) => {
@@ -122,18 +211,18 @@ app.post('/login', (req, res) => {
     return res.status(403).send('Forbidden access');
   }
 
-  const user = getUserObjectByEmail(email);
+  const user = getUserObject('email', email);
 
   if (user.password !== password) {
     return res.status(403).send('Forbidden access');
   }
 
-  res.cookie('username', user.id);
+  res.cookie('user_ID', user.id);
   res.redirect('/urls');
 });
 
 app.post('/logout', (req, res) => {
-  res.clearCookie('username');
+  res.clearCookie('user_ID');
   res.redirect('/urls/');
 });
 
@@ -152,7 +241,7 @@ app.post('/register', (req, res) => {
   const userID = generateRandomString();
   users[userID] = { id: userID, email: email, password: password };
   
-  res.cookie('username', userID);
+  res.cookie('user_ID', userID);
   res.redirect('/urls');
 });
 
