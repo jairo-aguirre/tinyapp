@@ -76,7 +76,7 @@ app.get('/urls', (req, res) => {
 
   if (userID) {
     const templateVars = { username: getUserObject('user', userID, users), urls: urlsForUser(userID, urlDatabase) };
-    
+
     res.render('urls_index', templateVars);
 
     return;
@@ -89,7 +89,7 @@ app.get('/urls/new', (req, res) => {
   const userID = req.session.user_ID;
 
   const templateVars = { username: getUserObject('user', userID, users) };
-  
+
   if (templateVars.username === null) {
     res.redirect('/login');
     return;
@@ -101,7 +101,7 @@ app.get('/urls/:shortURL', (req, res) => {
   const shortURL = req.params.shortURL;
   const userID = req.session.user_ID;
   const userUrls = urlsForUser(userID, urlDatabase);
-  
+
   if (userID) {
     if (userUrls[shortURL]) {
       const templateVars = { username: getUserObject('user', userID, users), shortURL: shortURL, longURL: userUrls[shortURL].longURL };
@@ -117,25 +117,19 @@ app.get('/urls/:shortURL', (req, res) => {
 
 app.get('/u/:shortURL', (req, res) => {
   const shortURL = req.params.shortURL;
-  const userID = req.session.user_ID;
-  const userUrls = urlsForUser(userID, urlDatabase);
 
-  if (userID) {
-    if (userUrls[shortURL]) {
-      res.redirect(userUrls[shortURL].longURL);
-      return;
-    } else {
-      return res.status(404).send('Not found');
-    }
+  if (urlDatabase[shortURL]) {
+    res.redirect(urlDatabase[shortURL].longURL);
+    return;
+  } else {
+    return res.status(404).send('Sorry, URL not found');
   }
-
-  return res.status(401).send('Hi there, please <a href="/login">log in</a> or <a href="/register">register</a> to access TinyApp');
 });
 
 app.get('/register', (req, res) => {
   const userID = req.session.user_ID;
   const templateVars = { username: getUserObject('user', userID, users) };
-  
+
   if (templateVars.username !== null) {
     res.redirect('/urls');
     return;
@@ -158,10 +152,10 @@ app.get('/login', (req, res) => {
 // POST Routes start HERE!
 app.post('/urls', (req, res) => {
   const userID = req.session.user_ID;
-  
+
   if (userID) {
     const shortURL = generateRandomString();
-    const urlObject = {longURL: req.body.longURL, userID: userID};
+    const urlObject = { longURL: req.body.longURL, userID: userID };
     urlDatabase[shortURL] = urlObject;
     res.redirect(`/urls/${shortURL}`);
     return;
@@ -209,7 +203,7 @@ app.post('/urls/:shortURL/delete', (req, res) => {
 app.post('/login', (req, res) => {
   const email = req.body.email;
   const password = req.body.password;
-  
+
   if ((email === '') || (password === '')) {
     return res.status(400).send('Missing email or password');
   }
@@ -225,7 +219,7 @@ app.post('/login', (req, res) => {
     res.redirect('/urls');
     return;
   }
-  
+
   return res.status(403).send('Forbidden access');
 });
 
@@ -248,7 +242,7 @@ app.post('/register', (req, res) => {
 
   const userID = generateRandomString();
   users[userID] = { id: userID, email: email, password: bcryptjs.hashSync(password, 10) };
-  
+
   req.session.user_ID = userID;
   res.redirect('/urls');
 });
